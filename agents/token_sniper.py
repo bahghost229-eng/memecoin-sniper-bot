@@ -22,7 +22,7 @@ class TokenSniper:
                      "amount_sol":self.buy_amount_sol,"amount_tokens":res["out_amount"],
                      "tx_hash":res["tx_hash"],"opened_at":time.time()}
                 log.info("snipe_success", extra=pos)
-                await self.notify(f"✅ Achat\nToken: \`{mint}\`\nPrix: {res['price']:.10f}\nTx: \`{res['tx_hash']}\`","info")
+                await self.notify(f"✅ Achat\nToken: `{mint}`\nPrix: {res['price']:.10f}\nTx: `{res['tx_hash']}`","info")
                 await self.queue.put({"type":"position_opened","data":pos})
             except Exception as e:
                 log.exception("snipe_error", extra={"mint":mint,"error":str(e)})

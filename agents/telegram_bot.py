@@ -34,7 +34,7 @@ class TelegramInterface:
     async def wallets(self, u, c):
         if not self._auth(u): return
         ws=self.orch.funding_monitor.funding_wallets
-        await u.message.reply_text("*Wallets surveillés:*\n"+"\n".join(f"\`{w}\`" for w in ws) or "Aucun", parse_mode=ParseMode.MARKDOWN)
+        await u.message.reply_text("*Wallets surveillés:*\n"+"\n".join(f"`{w}`" for w in ws) or "Aucun", parse_mode=ParseMode.MARKDOWN)
     async def add_wallet(self, u, c):
         if not self._auth(u): return
         if not c.args: await u.message.reply_text("Usage: /add_wallet <address>"); return
@@ -45,7 +45,7 @@ class TelegramInterface:
         ps=self.orch.portfolio.list_positions()
         if not ps: await u.message.reply_text("Aucune position"); return
         await u.message.reply_text("*Positions:*\n"+"\n".join(
-            f"\`{p['token']}\` entrée {p['entry_price']:.10f} {p['amount_sol']} SOL" for p in ps), parse_mode=ParseMode.MARKDOWN)
+            f"`{p['token']}` entrée {p['entry_price']:.10f} {p['amount_sol']} SOL" for p in ps), parse_mode=ParseMode.MARKDOWN)
     async def config(self, u, c):
         if not self._auth(u): return
         if not c.args:
