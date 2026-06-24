@@ -1,0 +1,16 @@
+# Secrets - NE JAMAIS COMMIT
+config.yaml
+helius_key.txt
+*.key
+funder.json
+wallet*.json
+.env
+
+# Python
+venv/
+__pycache__/
+*.pyc
+*.log
+*.json.bak
+e2e_result.json
+mainnet_*.json

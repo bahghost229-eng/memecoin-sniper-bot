@@ -1,0 +1,56 @@
+# ============================================================
+# Configuration - MAINNET (copier vers config.yaml et remplir)
+# ============================================================
+general:
+  dry_run: true                 # true = simulation. Passer à false APRÈS tests réels !
+  paused: false
+  log_level: INFO
+
+rpc:
+  ws_url: "wss://ws.us.fluxrpc.com"
+  ws_reconnect_delay: 3
+  ws_max_reconnect_delay: 60
+
+helius:
+  api_key: "VOTRE_CLE_HELIUS"
+  rest_url: "https://api.helius.xyz/v0"
+  rpc_url: "https://mainnet.helius-rpc.com"
+
+jupiter:
+  quote_url: "https://quote-api.jup.ag/v6/quote"
+  swap_url: "https://quote-api.jup.ag/v6/swap"
+  sol_mint: "So11111111111111111111111111111111111111112"
+
+telegram:
+  bot_token: "VOTRE_TOKEN_TELEGRAM"
+  chat_id: "VOTRE_CHAT_ID"
+
+wallet:
+  encrypted_private_key: "gAAAAAB..."   # généré via: python -m utils.crypto encrypt
+  # passphrase fournie via variable d'env SNIPER_KEY_PASSPHRASE
+
+funding:
+  min_sol: 1.5
+  max_sol: 5.0
+  graph_window_minutes: 10
+  dust_threshold_sol: 0.05
+
+funding_wallets:
+  - "FinanceurAdresse1111111111111111111111111111"
+
+trading:
+  buy_amount_sol: 0.1
+  slippage_bps: 1500
+  priority_fee_lamports: 100000
+
+portfolio:
+  stop_loss_pct: -50
+  take_profit_pct: 200
+  min_liquidity_sol: 5.0
+  poll_interval_sec: 5
+
+patterns:
+  detect_bundling: true
+  detect_lp_timing: true
+  detect_vanity: true
+  vanity_prefixes: ["pump", "moon", "doge", "elon"]
