@@ -7,17 +7,31 @@ Wants=network-online.target
 Type=simple
 User=sniper
 WorkingDirectory=/opt/memecoin_sniper
-Environment="SNIPER_KEY_PASSPHRASE=CHANGE_ME"
-Environment="HELIUS_RPC_URL=https://mainnet.helius-rpc.com/?api-key=VOTRE_CLE"
+
+# --- Secrets : JAMAIS en clair dans cette unité ---
+# Passphrase fournie via systemd credentials (copiée sur tmpfs, lisible par ce seul service).
+#   sudo install -d -m 700 /etc/sniper
+#   printf '%s' 'TA_PASSPHRASE' | sudo tee /etc/sniper/passphrase >/dev/null
+#   sudo chmod 600 /etc/sniper/passphrase
+LoadCredential=passphrase:/etc/sniper/passphrase
+Environment="SNIPER_KEY_PASSPHRASE_FILE=%d/passphrase"
+# HELIUS_RPC_URL (avec clé API) dans un fichier 600 dédié, pas dans l'unité :
+#   echo 'HELIUS_RPC_URL=https://mainnet.helius-rpc.com/?api-key=VOTRE_CLE' | sudo tee /etc/sniper/env >/dev/null
+#   sudo chmod 600 /etc/sniper/env
+EnvironmentFile=/etc/sniper/env
+
 ExecStart=/opt/memecoin_sniper/venv/bin/python main.py
 Restart=always
 RestartSec=5
 StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=sniper
+
+# Durcissement
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
+ProtectHome=true
 ReadWritePaths=/opt/memecoin_sniper
 
 [Install]

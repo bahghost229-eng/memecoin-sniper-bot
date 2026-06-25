@@ -19,7 +19,7 @@ class Orchestrator:
         self.telegram=TelegramInterface(config, self)
         self.funding_monitor=FundingWalletMonitor(config, self.helius, self.event_queue)
         self.pattern_detector=PatternDetector(config, self.helius, self.event_queue)
-        self.token_sniper=TokenSniper(config, self.jupiter, self.event_queue, self.notify)
+        self.token_sniper=TokenSniper(config, self.jupiter, self.helius, self.event_queue, self.notify)
         self.portfolio=PortfolioManager(config, self.jupiter, self.helius, self.event_queue, self.notify)
         self._tasks=[]
     async def notify(self, message, level="info"): await self.telegram.send_notification(message, level)

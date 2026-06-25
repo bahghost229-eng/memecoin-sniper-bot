@@ -66,18 +66,39 @@ sudo -u sniper nano config.yaml                    # clés Helius, Telegram, wal
 sudo -u sniper ./venv/bin/python -m utils.crypto encrypt   # -> encrypted_private_key
 sudo chmod 600 config.yaml
 
-# 4. systemd (passphrase + clé RPC dans le service)
+# 4. Secrets hors de l'unité systemd (credentials + EnvironmentFile 600)
+sudo install -d -m 700 /etc/sniper
+printf '%s' 'TA_PASSPHRASE' | sudo tee /etc/sniper/passphrase >/dev/null
+echo 'HELIUS_RPC_URL=https://mainnet.helius-rpc.com/?api-key=VOTRE_CLE' | sudo tee /etc/sniper/env >/dev/null
+sudo chmod 600 /etc/sniper/passphrase /etc/sniper/env
+
+# 5. systemd (l'unité ne contient AUCUN secret)
 sudo cp systemd/sniper.service /etc/systemd/system/
-sudo nano /etc/systemd/system/sniper.service       # SNIPER_KEY_PASSPHRASE, HELIUS_RPC_URL
 sudo systemctl daemon-reload
 sudo systemctl enable --now sniper
 
-# 5. Logs JSON
+# 6. Logs JSON
 journalctl -u sniper -f -o cat
 ```
 
 ## Sécurité
 
 - `config.yaml`, `helius_key.txt`, `*.json` de wallets sont **gitignore**.
-- Clé privée chiffrée (Fernet) ; passphrase via variable d'env uniquement.
-- `chmod 600 config.yaml` sur le serveur.
+- Clé privée chiffrée (Fernet, PBKDF2 480k itérations).
+- **Passphrase hors de l'unité systemd** : via `SNIPER_KEY_PASSPHRASE` (env) ou
+  `SNIPER_KEY_PASSPHRASE_FILE` (credential systemd sur tmpfs). Ne jamais l'écrire dans `.service`.
+- `chmod 600` sur `/etc/sniper/passphrase`, `/etc/sniper/env` et `config.yaml`.
+
+## Garde-fous trading (anti-rug / honeypot)
+
+- **Avant chaque achat** : refus si la *freeze authority* du mint est active, et refus si le token
+  n'a **aucune route de vente** (honeypot probable). Cf. section `safety` de la config.
+- **Swaps confirmés on-chain** (`getSignatureStatuses`) avant d'ouvrir une position.
+- **Sortie sur impact** : revente si l'impact de prix dépasse `max_price_impact_pct` (proxy de liquidité).
+- PnL calculé sur la **valeur réalisable** (revente simulée → SOL) vs le coût, pas sur des prix d'unités hétérogènes.
+
+## Tests
+
+```bash
+python -m unittest discover -s tests -v
+```

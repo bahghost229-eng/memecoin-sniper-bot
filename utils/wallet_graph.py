@@ -1,4 +1,5 @@
 """Graphe de transactions - identification du wallet de convergence (pattern brouillage)."""
+from __future__ import annotations   # compat 3.9 pour la syntaxe `X | None`
 import time
 from collections import defaultdict
 from typing import Dict, List

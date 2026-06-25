@@ -48,8 +48,18 @@ class HeliusClient:
                 if ch.get("mint"): return ch["mint"]
         return None
     async def get_pool_liquidity_sol(self, mint):
-        # TODO: lire les réserves réelles du pool Raydium/Pump.fun selon la plateforme
+        # NOTE: stub. La protection liquidité fonctionnelle est basée sur le price impact
+        # d'une revente (cf. PortfolioManager + JupiterClient.get_position_value).
+        # TODO: lire les réserves réelles du pool Raydium/Pump.fun pour une mesure directe.
         return None
+    async def get_mint_authorities(self, mint):
+        """Renvoie {mint_authority, freeze_authority} via getAccountInfo jsonParsed, sinon None."""
+        try:
+            res = await self._rpc("getAccountInfo", [mint, {"encoding": "jsonParsed"}])
+            info = ((((res or {}).get("value") or {}).get("data") or {}).get("parsed") or {}).get("info", {})
+            return {"mint_authority": info.get("mintAuthority"), "freeze_authority": info.get("freezeAuthority")}
+        except Exception as e:
+            log.warning("mint_authorities_failed", extra={"mint": mint, "error": str(e)}); return None
     async def detect_bundling(self, mint, creation_sig):
         try:
             tx = await self.get_transaction(creation_sig)
