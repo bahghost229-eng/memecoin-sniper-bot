@@ -1,5 +1,6 @@
 # Secrets - NE JAMAIS COMMIT
 config.yaml
+config.runtime.yaml
 helius_key.txt
 *.key
 funder.json

@@ -42,11 +42,14 @@ trading:
   buy_amount_sol: 0.1
   slippage_bps: 1500
   priority_fee_lamports: 100000
+  confirm_timeout_sec: 45        # attente max de confirmation on-chain d'un swap
+  confirm_poll_sec: 2            # intervalle de polling getSignatureStatuses
 
 portfolio:
   stop_loss_pct: -50
   take_profit_pct: 200
   min_liquidity_sol: 5.0
+  max_price_impact_pct: 15       # sortie si l'impact de revente dépasse ce seuil (proxy liquidité). 0 = off
   poll_interval_sec: 5
 
 patterns:
@@ -54,3 +57,8 @@ patterns:
   detect_lp_timing: true
   detect_vanity: true
   vanity_prefixes: ["pump", "moon", "doge", "elon"]
+
+safety:
+  require_sellable: true         # anti-honeypot : refuse d'acheter si aucune route de vente
+  block_freeze_authority: true   # refuse si la freeze authority du mint est active
+  block_mint_authority: false    # refuse si la mint authority est active (souvent normal au lancement)
