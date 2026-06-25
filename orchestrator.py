@@ -4,6 +4,7 @@ from agents.funding_monitor import FundingWalletMonitor
 from agents.pattern_detector import PatternDetector
 from agents.token_sniper import TokenSniper
 from agents.portfolio_manager import PortfolioManager
+from agents.manual_trader import ManualTrader
 from agents.telegram_bot import TelegramInterface
 from utils.helius_client import HeliusClient
 from utils.jupiter_client import JupiterClient
@@ -21,6 +22,7 @@ class Orchestrator:
         self.pattern_detector=PatternDetector(config, self.helius, self.event_queue)
         self.token_sniper=TokenSniper(config, self.jupiter, self.helius, self.event_queue, self.notify)
         self.portfolio=PortfolioManager(config, self.jupiter, self.helius, self.event_queue, self.notify)
+        self.trader=ManualTrader(config, self.jupiter, self.helius, self.portfolio, self.event_queue)
         self._tasks=[]
     async def notify(self, message, level="info"): await self.telegram.send_notification(message, level)
     def is_paused(self): return self.state["paused"]

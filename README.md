@@ -15,7 +15,19 @@ et snipe automatiquement les nouveaux tokens via Jupiter.
 | PatternDetector | direct, brouillage (graphe de convergence 10 min), bundling, LP timing, vanity |
 | TokenSniper | achat immédiat via Jupiter (slippage configurable) |
 | PortfolioManager | stop-loss / take-profit / liquidité auto-sell |
-| TelegramInterface | /status /wallets /add_wallet /positions /config /pause /resume |
+| TelegramInterface | Terminal manuel (/wallet /buy /sell /positions) + sniper (/status /wallets /add_wallet /config /pause /resume) |
+
+## Terminal de trading (Telegram)
+
+En plus du sniper automatique, le bot expose un **terminal manuel** style Trojan/Tradewiz :
+
+- `/wallet` — adresse du wallet de trading + solde SOL.
+- `/buy` — colle un **mint** → infos (liquidité, vendable, freeze authority) → boutons montant
+  (presets `trading.presets_sol` ou montant libre). Achat passé par le **garde-fou anti-honeypot**.
+- `/sell` — liste les positions → vente **25 / 50 / 100 %** sur le **solde réel on-chain**.
+- `/positions` — positions ouvertes avec **PnL en direct** (valeur réalisable vs coût).
+
+Le sniper automatique (funding wallets → snipe) reste actif en parallèle. Boutons inline via `/menu`.
 
 ## Statut des tests
 

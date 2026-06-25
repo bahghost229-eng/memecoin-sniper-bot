@@ -1,5 +1,6 @@
 """Agent 3 - Achat immédiat via Jupiter dès détection, avec garde-fous de sécurité."""
 import asyncio, time
+from utils.safety import check_token
 from utils.logger import get_logger
 log = get_logger("token_sniper")
 
@@ -16,16 +17,10 @@ class TokenSniper:
     async def run(self):
         while True: await asyncio.sleep(3600)
     async def _safety_check(self, mint):
-        """Garde-fous anti-rug/honeypot AVANT tout achat."""
-        auth=await self.helius.get_mint_authorities(mint)
-        if auth:
-            if self.block_freeze_authority and auth.get("freeze_authority"):
-                return False, "freeze authority active (gel possible / honeypot)"
-            if self.block_mint_authority and auth.get("mint_authority"):
-                return False, "mint authority active (mint infini possible)"
-        if self.require_sellable and not await self.jupiter.is_sellable(mint):
-            return False, "aucune route de vente (honeypot probable)"
-        return True, None
+        """Garde-fous anti-rug/honeypot AVANT tout achat (logique partagée)."""
+        return await check_token(self.helius, self.jupiter, mint,
+            require_sellable=self.require_sellable, block_freeze=self.block_freeze_authority,
+            block_mint=self.block_mint_authority)
     async def snipe(self, data):
         mint=data["mint"]
         async with self._lock:
