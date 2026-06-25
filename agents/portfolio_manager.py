@@ -24,10 +24,21 @@ class PortfolioManager:
             except asyncio.CancelledError: raise
             except Exception as e: log.exception("portfolio_error", extra={"error":str(e)})
             await asyncio.sleep(self.poll)
+    async def _live_qty(self, token, pos):
+        """Solde RÉEL on-chain si dispo, sinon le montant quoté à l'achat (fallback dry_run / RPC KO)."""
+        bal = await self.jupiter.get_token_balance(token)
+        return pos.get("amount_tokens", 0) if bal is None else bal
     async def _check(self):
         for token,pos in list(self.positions.items()):
             try:
-                val=await self.jupiter.get_position_value(token, pos.get("amount_tokens",0))
+                qty = await self._live_qty(token, pos)
+                if qty is not None and qty <= 0:        # plus de tokens : vendu hors-bot / transfert / rug
+                    log.info("position_emptied", extra={"token":token})
+                    self.remove_position(token)
+                    await self.notify(f"ℹ️ Position vidée on-chain (vendue/transférée/rug) : {token}","info")
+                    await self.queue.put({"type":"position_closed","data":{"token":token}})
+                    continue
+                val=await self.jupiter.get_position_value(token, qty)
                 if val is None: continue
                 cost=pos.get("amount_sol",0) or 0
                 value_sol=val["value_sol"]; impact=val.get("price_impact_pct",0)
@@ -36,12 +47,12 @@ class PortfolioManager:
                 if pnl<=self.stop_loss: reason=f"STOP-LOSS ({pnl:.1f}%)"
                 elif pnl>=self.take_profit: reason=f"TAKE-PROFIT (+{pnl:.1f}%)"
                 elif self.max_impact and impact>=self.max_impact: reason=f"LIQUIDITÉ FAIBLE (impact {impact:.1f}%)"
-                if reason: await self._sell(token,pos,pnl,reason)
+                if reason: await self._sell(token,pos,pnl,reason,qty)
             except Exception as e: log.warning("position_check_failed", extra={"token":token,"error":str(e)})
-    async def _sell(self, token, pos, pnl, reason):
-        log.info("sell_triggered", extra={"token":token,"reason":reason,"pnl":pnl})
+    async def _sell(self, token, pos, pnl, reason, qty):
+        log.info("sell_triggered", extra={"token":token,"reason":reason,"pnl":pnl,"qty":qty})
         try:
-            res=await self.jupiter.sell(token, pos["amount_tokens"], self.cfg["trading"]["slippage_bps"])
+            res=await self.jupiter.sell(token, qty, self.cfg["trading"]["slippage_bps"])
             if not res["success"]:
                 await self.notify(f"⚠️ Vente échouée {token}: {res.get('error')}","critical"); return
             await self.notify(f"💰 Vente ({reason})\nToken: {token}\nPnL: {pnl:+.1f}%\nTx: {res.get('tx_hash')}","info")

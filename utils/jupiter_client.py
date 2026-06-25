@@ -68,6 +68,29 @@ class JupiterClient:
         """Anti-honeypot : existe-t-il une route de vente token -> SOL ?"""
         q = await self.get_quote(mint, self.sol_mint, probe_units, 1500)
         return bool(q and q.get("outAmount") and int(q["outAmount"]) > 0)
+    async def get_token_balance(self, mint):
+        """Solde RÉEL (unités de base) du mint détenu par le wallet de trading.
+        Renvoie None si indisponible (dry_run, pas de keypair, ou RPC en échec)."""
+        if self.dry_run:
+            return None
+        try:
+            owner = str(self._keypair().pubkey())
+        except Exception as e:
+            log.warning("balance_no_keypair", extra={"error": str(e)}); return None
+        s = await self._s()
+        body = {"jsonrpc":"2.0","id":1,"method":"getTokenAccountsByOwner",
+                "params":[owner, {"mint": mint}, {"encoding":"jsonParsed"}]}
+        try:
+            async with s.post(self._rpc, json=body) as r:
+                res = (await r.json()).get("result", {})
+            total = 0
+            for acc in (res.get("value") or []):
+                info = (((acc.get("account") or {}).get("data") or {}).get("parsed") or {}).get("info", {})
+                amt = (info.get("tokenAmount") or {}).get("amount")
+                if amt is not None: total += int(amt)
+            return total
+        except Exception as e:
+            log.warning("get_token_balance_failed", extra={"mint": mint, "error": str(e)}); return None
     async def _send_raw(self, signed):
         s = await self._s()
         req = SendVersionedTransaction(signed, RpcSendTransactionConfig(preflight_commitment=CommitmentLevel.Confirmed))

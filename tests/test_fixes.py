@@ -12,14 +12,17 @@ from agents.token_sniper import TokenSniper
 
 # ---------- Fakes ----------
 class FakeJupiter:
-    def __init__(self, value_sol=0.1, impact=0.0, sellable=True):
-        self.value_sol=value_sol; self.impact=impact; self.sellable=sellable; self.sold=[]; self.bought=[]
+    def __init__(self, value_sol=0.1, impact=0.0, sellable=True, balance=None):
+        self.value_sol=value_sol; self.impact=impact; self.sellable=sellable; self.balance=balance
+        self.sold=[]; self.sold_qty=[]; self.bought=[]
     async def get_position_value(self, mint, amount_tokens):
         return {"value_sol": self.value_sol, "price_impact_pct": self.impact}
     async def is_sellable(self, mint, probe_units=1_000_000):
         return self.sellable
+    async def get_token_balance(self, mint):
+        return self.balance
     async def sell(self, mint, amount, slippage):
-        self.sold.append(mint); return {"success": True, "tx_hash": "SELLTX"}
+        self.sold.append(mint); self.sold_qty.append(amount); return {"success": True, "tx_hash": "SELLTX"}
     async def buy(self, mint, amount_sol, slippage):
         self.bought.append(mint)
         return {"success": True, "price": 0.0001, "out_amount": 1_000_000, "tx_hash": "BUYTX"}
@@ -61,6 +64,33 @@ class TestRealizablePnL(unittest.IsolatedAsyncioTestCase):
 
     async def test_impact_exit(self):
         self.assertEqual(await self._run_check(value_sol=0.1, impact=20.0), ["MINT"])
+
+
+# ---------- Vente sur solde RÉEL on-chain ----------
+class TestRealBalanceSell(unittest.IsolatedAsyncioTestCase):
+    def _pm(self, fake, queue=None):
+        pm = PortfolioManager(_cfg(), fake, FakeHelius(), queue or asyncio.Queue(), _noop_notify)
+        pm.add_position({"token": "MINT", "amount_sol": 0.1, "amount_tokens": 1_000_000, "entry_price": 0.0001})
+        return pm
+
+    async def test_sell_uses_real_balance_not_quote(self):
+        fake = FakeJupiter(value_sol=0.04, balance=777)   # -60% -> stop-loss
+        await self._pm(fake)._check()
+        self.assertEqual(fake.sold, ["MINT"])
+        self.assertEqual(fake.sold_qty, [777])            # solde réel, pas le 1_000_000 quoté
+
+    async def test_zero_balance_closes_without_selling(self):
+        fake = FakeJupiter(value_sol=0.04, balance=0); q = asyncio.Queue()
+        pm = self._pm(fake, q)
+        await pm._check()
+        self.assertEqual(fake.sold, [])                   # aucune vente tentée
+        self.assertNotIn("MINT", pm.positions)            # position retirée
+        self.assertFalse(q.empty())                       # event position_closed émis
+
+    async def test_fallback_to_quote_when_balance_none(self):
+        fake = FakeJupiter(value_sol=0.04, balance=None)  # dry_run / RPC KO
+        await self._pm(fake)._check()
+        self.assertEqual(fake.sold_qty, [1_000_000])      # retombe sur le montant quoté
 
 
 # ---------- Garde-fous sécurité ----------
