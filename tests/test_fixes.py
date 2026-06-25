@@ -244,5 +244,47 @@ class TestJupiterUnits(unittest.IsolatedAsyncioTestCase):
         self.assertAlmostEqual(val["price_impact_pct"], 2.0, places=6)
 
 
+# ---------- Overlay de config runtime (persistance /config) ----------
+class TestConfigStore(unittest.TestCase):
+    def setUp(self):
+        from utils import config_store
+        self.cs = config_store; self.dir = tempfile.mkdtemp()
+        self.base = os.path.join(self.dir, "config.yaml"); self.over = os.path.join(self.dir, "config.runtime.yaml")
+        with open(self.base, "w", encoding="utf-8") as f:
+            f.write("trading:\n  buy_amount_sol: 0.1\n  slippage_bps: 1500\nportfolio:\n  stop_loss_pct: -50\n")
+    def tearDown(self):
+        import shutil; shutil.rmtree(self.dir, ignore_errors=True)
+    def test_deep_merge(self):
+        base = {"a": {"x": 1, "y": 2}, "b": 3}
+        self.cs.deep_merge(base, {"a": {"y": 9, "z": 4}, "c": 5})
+        self.assertEqual(base, {"a": {"x": 1, "y": 9, "z": 4}, "b": 3, "c": 5})
+    def test_override_persists_and_base_preserved(self):
+        self.cs.save_override("trading", "buy_amount_sol", 0.5, overrides_path=self.over)
+        cfg = self.cs.load_config(self.base, self.over)
+        self.assertEqual(cfg["trading"]["buy_amount_sol"], 0.5)    # override appliqué
+        self.assertEqual(cfg["trading"]["slippage_bps"], 1500)     # reste de la base intact
+        self.assertEqual(cfg["portfolio"]["stop_loss_pct"], -50)
+    def test_load_without_overlay(self):
+        self.assertEqual(self.cs.load_config(self.base, self.over)["trading"]["buy_amount_sol"], 0.1)
+
+
+# ---------- Salt KDF par installation (rétro-compatible) ----------
+class TestCryptoSalt(unittest.TestCase):
+    def test_v2_roundtrip_unique_salt(self):
+        raw = bytes(range(64)); pk = base58.b58encode(raw).decode()
+        t1 = encrypt_private_key(pk, "pw"); t2 = encrypt_private_key(pk, "pw")
+        self.assertTrue(t1.startswith("v2:"))
+        self.assertNotEqual(t1, t2)                                # salt aléatoire -> tokens distincts
+        self.assertEqual(decrypt_private_key(t1, "pw"), raw)
+        self.assertEqual(decrypt_private_key(t2, "pw"), raw)
+    def test_legacy_static_salt_decrypts(self):
+        from utils import crypto
+        from cryptography.fernet import Fernet
+        raw = bytes(range(64)); pk = base58.b58encode(raw).decode()
+        legacy = Fernet(crypto._key("pw", crypto.SALT_LEGACY)).encrypt(pk.encode()).decode()
+        self.assertFalse(legacy.startswith("v2:"))                 # ancien format sans préfixe
+        self.assertEqual(decrypt_private_key(legacy, "pw"), raw)   # toujours déchiffrable
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

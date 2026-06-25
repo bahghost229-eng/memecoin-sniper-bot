@@ -4,6 +4,7 @@ from telegram import (Update, BotCommand, ReplyKeyboardMarkup,
 from telegram.constants import ParseMode
 from telegram.ext import (Application, CommandHandler, CallbackQueryHandler,
                           MessageHandler, filters, ContextTypes)
+from utils import config_store
 from utils.logger import get_logger
 log = get_logger("telegram")
 
@@ -140,9 +141,10 @@ class TelegramInterface:
             await self._reply(u, ("\u2705 " + c.args[0] + "=" + c.args[1]) if ok else ("\u274C Cle inconnue: " + c.args[0]))
     def _set(self, key, val):
         m={"buy_amount_sol":("trading",float),"slippage_bps":("trading",int),"stop_loss_pct":("portfolio",float),
-           "take_profit_pct":("portfolio",float),"min_liquidity_sol":("portfolio",float)}
+           "take_profit_pct":("portfolio",float),"min_liquidity_sol":("portfolio",float),
+           "max_price_impact_pct":("portfolio",float)}
         if key not in m: return False
-        sec,cast=m[key]; self.cfg[sec][key]=cast(val)
+        sec,cast=m[key]; cv=cast(val); self.cfg[sec][key]=cv
         if sec=="trading":
             self.orch.token_sniper.buy_amount_sol=self.cfg["trading"]["buy_amount_sol"]
             self.orch.token_sniper.slippage_bps=self.cfg["trading"]["slippage_bps"]
@@ -150,6 +152,9 @@ class TelegramInterface:
             self.orch.portfolio.stop_loss=self.cfg["portfolio"]["stop_loss_pct"]
             self.orch.portfolio.take_profit=self.cfg["portfolio"]["take_profit_pct"]
             self.orch.portfolio.min_liquidity=self.cfg["portfolio"]["min_liquidity_sol"]
+            self.orch.portfolio.max_impact=self.cfg["portfolio"].get("max_price_impact_pct", self.orch.portfolio.max_impact)
+        try: config_store.save_override(sec, key, cv)   # persiste l'override (survit au redémarrage)
+        except Exception as e: log.warning("config_persist_failed", extra={"error":str(e)})
         return True
     async def pause(self, u, c):
         if not self._auth(u): return

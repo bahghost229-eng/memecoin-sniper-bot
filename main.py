@@ -1,12 +1,9 @@
 """Point d'entrée du Memecoin Sniper Bot."""
 import asyncio, signal, sys
-import yaml
 from orchestrator import Orchestrator
+from utils.config_store import load_config
 from utils.logger import get_logger
 log = get_logger("main")
-
-def load_config(path="config.yaml"):
-    with open(path, "r", encoding="utf-8") as f: return yaml.safe_load(f)
 
 async def run():
     config=load_config(); log.info("config_loaded", extra={"dry_run":config["general"]["dry_run"]})
