@@ -94,7 +94,11 @@ journalctl -u sniper -f -o cat
 - **Avant chaque achat** : refus si la *freeze authority* du mint est active, et refus si le token
   n'a **aucune route de vente** (honeypot probable). Cf. section `safety` de la config.
 - **Swaps confirmés on-chain** (`getSignatureStatuses`) avant d'ouvrir une position.
-- **Sortie sur impact** : revente si l'impact de prix dépasse `max_price_impact_pct` (proxy de liquidité).
+- **Liquidité réelle (Pump.fun)** : lecture des réserves SOL de la bonding curve on-chain ; revente
+  si elles passent sous `min_liquidity_sol`. Repli **impact de prix** (`max_price_impact_pct`) pour
+  les plateformes dont le pool n'est pas encore lu (Raydium : découverte de pool à compléter).
+- **Vente sur solde réel** : la quantité vendue vient du solde on-chain (`getTokenAccountsByOwner`),
+  pas du montant estimé à l'achat ; position clôturée si le solde tombe à zéro.
 - PnL calculé sur la **valeur réalisable** (revente simulée → SOL) vs le coût, pas sur des prix d'unités hétérogènes.
 
 ## Tests
