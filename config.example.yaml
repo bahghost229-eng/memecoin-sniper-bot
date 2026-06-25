@@ -44,6 +44,7 @@ trading:
   priority_fee_lamports: 100000
   confirm_timeout_sec: 45        # attente max de confirmation on-chain d'un swap
   confirm_poll_sec: 2            # intervalle de polling getSignatureStatuses
+  presets_sol: [0.1, 0.5, 1.0]   # montants d'achat rapides (boutons du terminal)
 
 portfolio:
   stop_loss_pct: -50

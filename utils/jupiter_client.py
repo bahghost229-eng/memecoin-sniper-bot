@@ -91,6 +91,20 @@ class JupiterClient:
             return total
         except Exception as e:
             log.warning("get_token_balance_failed", extra={"mint": mint, "error": str(e)}); return None
+    def wallet_pubkey(self):
+        return str(self._keypair().pubkey())
+    async def _rpc_post(self, method, params):
+        s = await self._s()
+        async with s.post(self._rpc, json={"jsonrpc":"2.0","id":1,"method":method,"params":params}) as r:
+            return (await r.json()).get("result")
+    async def get_sol_balance(self):
+        """Solde SOL (en SOL) du wallet de trading, ou None si indispo."""
+        try:
+            res = await self._rpc_post("getBalance", [self.wallet_pubkey()])
+            val = res.get("value") if isinstance(res, dict) else res
+            return (int(val) / LAMPORTS) if val is not None else None
+        except Exception as e:
+            log.warning("get_sol_balance_failed", extra={"error": str(e)}); return None
     async def _send_raw(self, signed):
         s = await self._s()
         req = SendVersionedTransaction(signed, RpcSendTransactionConfig(preflight_commitment=CommitmentLevel.Confirmed))
