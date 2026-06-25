@@ -28,10 +28,12 @@ class FakeJupiter:
         return {"success": True, "price": 0.0001, "out_amount": 1_000_000, "tx_hash": "BUYTX"}
 
 class FakeHelius:
-    def __init__(self, freeze=None, mint_auth=None):
-        self.freeze=freeze; self.mint_auth=mint_auth
+    def __init__(self, freeze=None, mint_auth=None, liquidity=None):
+        self.freeze=freeze; self.mint_auth=mint_auth; self.liquidity=liquidity
     async def get_mint_authorities(self, mint):
         return {"mint_authority": self.mint_auth, "freeze_authority": self.freeze}
+    async def get_pool_liquidity_sol(self, mint, platform=None):
+        return self.liquidity
 
 
 def _cfg():
@@ -91,6 +93,67 @@ class TestRealBalanceSell(unittest.IsolatedAsyncioTestCase):
         fake = FakeJupiter(value_sol=0.04, balance=None)  # dry_run / RPC KO
         await self._pm(fake)._check()
         self.assertEqual(fake.sold_qty, [1_000_000])      # retombe sur le montant quoté
+
+
+# ---------- Liquidité réelle (Pump.fun bonding curve) ----------
+class TestPumpfunDecode(unittest.TestCase):
+    def test_decode_and_liquidity(self):
+        import struct
+        from utils import pumpfun
+        data = bytes(8) + struct.pack("<QQQQQ", 100, 30_000_000_000, 200, 12_000_000_000, 1_000_000) + b"\x00"
+        dec = pumpfun.decode_bonding_curve(data)
+        self.assertEqual(dec["real_sol_reserves"], 12_000_000_000)
+        self.assertFalse(dec["complete"])
+        self.assertAlmostEqual(pumpfun.bonding_curve_liquidity_sol(dec), 12.0)
+
+    def test_decode_too_short(self):
+        from utils import pumpfun
+        self.assertIsNone(pumpfun.decode_bonding_curve(b"\x00" * 10))
+        self.assertIsNone(pumpfun.decode_bonding_curve(None))
+
+    def test_pda_deterministic(self):
+        from utils import pumpfun
+        m = "So11111111111111111111111111111111111111112"
+        self.assertEqual(pumpfun.bonding_curve_pda(m), pumpfun.bonding_curve_pda(m))
+        self.assertTrue(32 <= len(pumpfun.bonding_curve_pda(m)) <= 44)
+
+
+class TestPumpfunWiring(unittest.IsolatedAsyncioTestCase):
+    def _hc(self, real_sol, complete=False):
+        import struct
+        from utils.helius_client import HeliusClient
+        hc = HeliusClient({"api_key": "x", "rest_url": "http://x", "rpc_url": "http://x"})
+        data = bytes(8) + struct.pack("<QQQQQ", 1, 1, 1, real_sol, 1) + (b"\x01" if complete else b"\x00")
+        async def fake_acc(addr): return data
+        hc.get_account_info_b64 = fake_acc
+        return hc
+
+    async def test_reads_real_sol_reserves(self):
+        hc = self._hc(7_500_000_000)
+        liq = await hc.get_pumpfun_liquidity_sol("So11111111111111111111111111111111111111112")
+        self.assertAlmostEqual(liq, 7.5)
+
+    async def test_completed_curve_returns_none(self):
+        hc = self._hc(7_500_000_000, complete=True)   # migré -> plus la source de liquidité
+        self.assertIsNone(await hc.get_pumpfun_liquidity_sol("So11111111111111111111111111111111111111112"))
+
+
+class TestLiquidityExit(unittest.IsolatedAsyncioTestCase):
+    def _pm(self, liquidity):
+        fake = FakeJupiter(value_sol=0.1)             # PnL ~0 : ni SL ni TP
+        pm = PortfolioManager(_cfg(), fake, FakeHelius(liquidity=liquidity), asyncio.Queue(), _noop_notify)
+        pm.add_position({"token": "MINT", "platform": "pump.fun", "amount_sol": 0.1, "amount_tokens": 1_000_000})
+        return pm, fake
+
+    async def test_low_liquidity_exits(self):
+        pm, fake = self._pm(liquidity=2.0)            # < min_liquidity_sol (5)
+        await pm._check()
+        self.assertEqual(fake.sold, ["MINT"])
+
+    async def test_healthy_liquidity_holds(self):
+        pm, fake = self._pm(liquidity=50.0)
+        await pm._check()
+        self.assertEqual(fake.sold, [])
 
 
 # ---------- Garde-fous sécurité ----------

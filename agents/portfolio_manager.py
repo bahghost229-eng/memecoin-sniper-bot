@@ -43,10 +43,12 @@ class PortfolioManager:
                 cost=pos.get("amount_sol",0) or 0
                 value_sol=val["value_sol"]; impact=val.get("price_impact_pct",0)
                 pnl=((value_sol-cost)/cost)*100 if cost else 0
+                liq=await self.helius.get_pool_liquidity_sol(token, pos.get("platform"))
                 reason=None
                 if pnl<=self.stop_loss: reason=f"STOP-LOSS ({pnl:.1f}%)"
                 elif pnl>=self.take_profit: reason=f"TAKE-PROFIT (+{pnl:.1f}%)"
-                elif self.max_impact and impact>=self.max_impact: reason=f"LIQUIDITÉ FAIBLE (impact {impact:.1f}%)"
+                elif liq is not None and self.min_liquidity and liq<self.min_liquidity: reason=f"LIQUIDITÉ FAIBLE ({liq:.2f} SOL)"
+                elif self.max_impact and impact>=self.max_impact: reason=f"IMPACT ÉLEVÉ ({impact:.1f}%)"
                 if reason: await self._sell(token,pos,pnl,reason,qty)
             except Exception as e: log.warning("position_check_failed", extra={"token":token,"error":str(e)})
     async def _sell(self, token, pos, pnl, reason, qty):
